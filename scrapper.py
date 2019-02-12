@@ -3,9 +3,7 @@ from exceptions import ValueError
 
 import zillow
 import requests
-import unicodecsv as csv
 import urllib3
-import argparse
 import googlemaps
 import re
 
@@ -74,8 +72,6 @@ def parse (city, state, max_price=100000, min_n_beds=2):
 				num_nearby_hospitals = len (nearby_hospitals['results'])
 				nearby_universities = gmaps.places_nearby(type="university", location=(latitude, longitude), radius=1000)
 				num_nearby_universities = len (nearby_universities['results'])
-								
-				# response = requests.get (property_url, headers=headers, verify=False)
 
 				data = {
 					'address':address,
