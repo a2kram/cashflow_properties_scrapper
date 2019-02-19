@@ -1,5 +1,5 @@
 gapi_key
 zws_key
-chromedriver.exe
-debug.log
-geckodriver.log
+*.exe
+*.log
+*.pyc
