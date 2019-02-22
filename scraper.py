@@ -1,7 +1,8 @@
 from lxml import html
 
-from utilities import print_time, print_err
+from utilities import print_time, print_err, is_digit
 from property_info import property_analyzer
+from property_analysis import process_results
 
 import requests
 import urllib3
@@ -19,61 +20,6 @@ headers = {
 					'upgrade-insecure-requests':'1',
 					'user-agent':'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36'
 		}
-
-
-def process_results (results):
-	lucratives = []
-
-	print "Analyzing investment opportunities",
-
-	for result in results:
-		print ".",
-
-		price = result["price"]
-		zestimate = result["zestimate"]
-		rental = result["rental"]
-		hospitals = result["nearby_hospitals"]
-		uni = result["nearby_uni"]
-
-		output = {}
-
-		if price and zestimate:
-			value_ratio = price * 1.0 / zestimate * 100
-
-			if value_ratio < 50:
-				output["url"] = result["url"]
-				output["opportunity"] = {}
-				output["opportunity"]["equity-discount"] = round (100 - value_ratio, 2)
-
-				if hospitals:
-					output["opportunity"]["Nearby hospitals"] = hospitals
-
-				if uni:
-					output["opportunity"]["Nearby universities"] = uni
-		
-		if rental and price: 
-			rental_ratio = rental * 1.0 / price * 100
-
-			if rental_ratio > 1.5:
-				if not output:
-					output["url"] = result["url"]
-					output["opportunity"] = {}
-					
-					if hospitals:
-						output["opportunity"]["Nearby hospital"] = hospitals
-
-					if uni:
-						output["opportunity"]["Nearby universities"] = uni
-
-				output["opportunity"]["cash-on-cash"] = round (rental_ratio, 2)
-
-		if output:
-			lucratives.append (output)
-
-	for i_prop, prop in enumerate (lucratives):
-		print ""
-		print "{0}) {1}".format (i_prop, prop["url"])
-		print prop["opportunity"]
 
 
 def zillow_scrape (city, state, max_price, min_n_beds):
@@ -127,7 +73,20 @@ def zillow_scrape (city, state, max_price, min_n_beds):
 				zestimate, tax, year, geocode = prop_analyzer.get_zestimate_info (zpid)
 				nearby_hospitals, nearby_uni = prop_analyzer.get_nearby_info (geocode, 1)
 				# rental, year = prop_analyzer.get_zillow_rental_info (prop_url)
-				rental = prop_analyzer.get_rental_comps_craigslist (address, city, postal_code, 3, info)
+				
+				bd = None
+				ba = None
+				sqft = None
+
+				if info:
+					info = [float (s) for s in info.replace (",", "").split () if is_digit (s)]
+					
+					if len (info) == 3:
+						bd = info[0]
+						ba = info[1]
+						sqft = info[2]
+
+				rental = prop_analyzer.get_rental_comps_craigslist (address, city, postal_code, 3, bd, ba, sqft)
 
 				data["address"] = address
 				data["price"] = price

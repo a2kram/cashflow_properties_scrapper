@@ -2,12 +2,26 @@ from lxml import html
 
 from selenium import webdriver
 from craigslist import CraigslistHousing 
-from utilities import print_time, print_err, get_geocode_from_address, get_distance_bw_geocodes
+from utilities import print_time, print_err, get_geocode_from_address, get_distance_bw_geocodes, is_digit
 
 import re
 import zillow
 import urllib3
+import requests
 import googlemaps
+
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+headers = {
+					'accept':'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+					'accept-encoding':'gzip, deflate, br',
+					'accept-language':'en-US,en;q=0.9,ar;q=0.8',
+					'cache-control':'max-age=0',
+					'upgrade-insecure-requests':'1',
+					'user-agent':'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36'
+		}
 
 
 class property_analyzer ():
@@ -129,22 +143,17 @@ class property_analyzer ():
             print "{0}".format (e)
 
 
-    def get_rental_comps_craigslist (self, address, city, zipcode, limit, info):
-        if not address or not city or not zipcode or not limit or not info:
+    def get_rental_comps_craigslist (self, address, city, zipcode, limit, bd, ba, sqft):
+        if not address or not city or not zipcode or not limit:
             return None
 
         rents = []
         geocode = get_geocode_from_address (address)
 
-        if not geocode:
+        if not geocode or not bd or not ba or not sqft:
             return None
 
         try:
-            bd, ba, sqft = [int(s) for s in info.replace (",", "").split() if s.isdigit()]
-
-            if not bd or not ba or not sqft:
-                return None
-
             cl_h = CraigslistHousing (site=city.lower (), category="apa", 
                 filters={'zip_code':zipcode, 'search_distance':limit, 'min_bedrooms':bd, 'max_bedrooms':bd,
                 "min_bathrooms":ba, "max_bathrooms":ba, "min_ft2":max (0, sqft - 300), "max_ft2":sqft + 300,
@@ -162,6 +171,7 @@ class property_analyzer ():
             return sum (rents) / float (len (rents))
         
         return None
+
 
     def get_zillow_rental_info (self, url):
         rental = None
@@ -197,3 +207,23 @@ class property_analyzer ():
                 year = parser.xpath (".//div[@class='fact-value']//text()")[1]
 
         return rental, year
+
+    
+    def get_info_from_zillow (self, zpid):
+        url = "https://www.zillow.com/homedetails/{0}_zpid/".format (zpid)
+        response = requests.get (url, headers=headers, verify=False)
+        parser = html.fromstring (response.text)
+
+        raw_info = parser.xpath (".//h3[@class='edit-facts-light']//text()")
+
+        if not raw_info:
+            return None, None, None
+
+        info = ", ".join (raw_info)
+
+        info = [float (s) for s in info.replace (",", "").split () if is_digit (s)]
+
+        if len (info) != 3:
+            return None, None, None
+        
+        return info[0], info[1], info[2]
